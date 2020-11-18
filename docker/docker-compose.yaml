@@ -1,0 +1,28 @@
+version: "3"
+
+services:
+  minio:
+    image: minio/minio
+    environment:
+      - MINIO_ACCESS_KEY=app-dev
+      - MINIO_SECRET_KEY=app-dev
+    ports:
+      - 9000:9000
+    command: ["server", "--config-dir", "/etc/minio", "/data"]
+
+  app:
+    image: app
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      - PYTHON_VERSION=3.8.*
+      - BODO_CONDA_USERNAME=${BODO_CONDA_USERNAME:-test}
+      - BODO_CONDA_TOKEN=${BODO_CONDA_TOKEN:-test}
+
+  waiter:
+    image: jwilder/dockerize
+    command: |
+      dockerize -wait tcp://minio:9000
+                -wait-retry-interval 5s
+                -timeout 10m
