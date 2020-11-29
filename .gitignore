@@ -128,5 +128,16 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# vscode
+.vscode
+
 # docker env
-docker/environment-dev.yml
+devops/environment-dev.yml
+devops/.passwd-s3fs
+
+# bodoai
+bodo.lic
+
+# tests
+tests/data
+data/

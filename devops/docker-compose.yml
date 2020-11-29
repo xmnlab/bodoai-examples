@@ -4,8 +4,8 @@ services:
   minio:
     image: minio/minio
     environment:
-      - MINIO_ACCESS_KEY=app-dev
-      - MINIO_SECRET_KEY=app-dev
+      - MINIO_ACCESS_KEY=${ACCESS_KEY_ID}
+      - MINIO_SECRET_KEY=${SECRET_ACCESS_KEY}
     ports:
       - 9000:9000
     command: ["server", "--config-dir", "/etc/minio", "/data"]

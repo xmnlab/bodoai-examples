@@ -1,7 +1,0 @@
-channels:
-  - conda-forge
-dependencies:
-  - python
-  - jupyter-lab
-  - https://{{ BODO_CONDA_USERNAME }}:{{ BODO_CONDA_TOKEN }}@bodo.jfrog.io/artifactory/api/conda/bodo.ai::bodo
-  - pytest

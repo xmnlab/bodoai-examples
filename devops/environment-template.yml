@@ -1,0 +1,33 @@
+channels:
+  - https://{{ BODO_CONDA_USERNAME }}:{{ BODO_CONDA_TOKEN }}@bodo.jfrog.io/artifactory/api/conda/bodo.ai
+  - conda-forge
+  - pytorch
+  - default
+dependencies:
+  - awscli
+  - bodo
+  - bokeh
+  - boto3
+  - botocore
+  - ipyparallel
+  - ipython
+  - numpy
+  - pandas
+  - pip
+  - pytest
+  - python-dotenv
+  - python
+  - pytorch=1.5
+  # - s3fs-fuse
+  - scipy
+  - scikit-learn
+  - torchvision=0.6
+  # development
+  - docker-compose
+  - black
+  - flake8
+  - mypy
+  - pre-commit
+  - pip:
+    - awscli-plugin-endpoint
+    - horovod[pytorch]

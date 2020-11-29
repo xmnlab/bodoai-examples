@@ -1,1 +1,0 @@
-from bodoai_minio_example import storage
