@@ -1,11 +1,16 @@
 
 TEST_PARAMS:=
+FILEPATH:=
+NUM_PROCESSES:=4
 
 start-services:
 	docker-compose --file docker/docker-compose.yml up -d
 
+run:
+	env `cat .env` mpirun -n ${NUM_PROCESSES} python ${FILEPATH}
+
 test:
-	env `cat .env` mpirun -n 4 python -m pytest -v -s ${TEST_PARAMS}
+	env `cat .env` mpirun -n ${NUM_PROCESSES} python -m pytest -v -s ${TEST_PARAMS}
 
 create-conda-env:
 	env `cat .env` ./devops/create_conda_env.sh

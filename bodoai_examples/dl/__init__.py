@@ -14,6 +14,9 @@ import torch.optim as optim
 # github.com/horovod/horovod/blob/master/examples/pytorch/pytorch_mnist.py
 
 
+LOG_INTERVAL = 10
+
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -33,9 +36,6 @@ class Net(nn.Module):
         return F.log_softmax(x)
 
 
-log_interval = 10
-
-
 def train(model, train_loader, train_sampler, optimizer, epoch, cuda):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -46,7 +46,7 @@ def train(model, train_loader, train_sampler, optimizer, epoch, cuda):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
-        if batch_idx % log_interval == 0:
+        if batch_idx % LOG_INTERVAL == 0:
             print(
                 "[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
                     hvd.rank(),
@@ -96,81 +96,83 @@ def test(model, test_dataset, test_loader, cuda):
 
 
 def deep_learning(X_train, y_train, X_test, y_test):
+    if not hvd.is_initialized():
+        # ranks not using horovod (e.g. non-gpu ranks) skip
+        # deep learning args
+        print('[WW] Deep learning skipped.')
+        return
+
     print(
         "[{}] X_train size is {}, y_train size is {}".format(
             bodo.get_rank(), len(X_train), len(y_train)
         )
     )
-    if (
-        hvd.is_initialized()
-    ):  # ranks not using horovod (e.g. non-gpu ranks) skip
-        # deep learning args
-        seed = 42
-        momentum = 0.5  # SGD momentum
-        use_adasum = False  # use adasum algorithm to do reduction
-        lr = 0.01  # learning rate
-        gradient_predivide_factor = (
-            1.0  # apply gradient predivide factor in optimizer
-        )
-        lr_scaler = hvd.size() if not use_adasum else 1
-        fp16_allreduce = False  # use fp16 compression during allreduce
-        epochs = 3
 
-        cuda = bodo.dl.is_cuda_available()
-        torch.manual_seed(seed)
-        if cuda:
-            torch.cuda.manual_seed(seed)
+    seed = 42
+    momentum = 0.5  # SGD momentum
+    use_adasum = False  # use adasum algorithm to do reduction
+    lr = 0.01  # learning rate
+    gradient_predivide_factor = (
+        1.0  # apply gradient predivide factor in optimizer
+    )
+    lr_scaler = hvd.size() if not use_adasum else 1
+    fp16_allreduce = False  # use fp16 compression during allreduce
+    epochs = 4
 
-        train_dataset = torch.utils.data.TensorDataset(
-            torch.from_numpy(X_train).unsqueeze(1), torch.from_numpy(y_train)
-        )
-        train_sampler = torch.utils.data.RandomSampler(train_dataset)
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=64, sampler=train_sampler
-        )
+    cuda = bodo.dl.is_cuda_available()
+    torch.manual_seed(seed)
 
-        test_dataset = torch.utils.data.TensorDataset(
-            torch.from_numpy(X_test).unsqueeze(1), torch.from_numpy(y_test)
-        )
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=1000
-        )
+    if cuda:
+        torch.cuda.manual_seed(seed)
 
-        model = Net()
+    train_dataset = torch.utils.data.TensorDataset(
+        torch.from_numpy(X_train).unsqueeze(1), torch.from_numpy(y_train)
+    )
+    train_sampler = torch.utils.data.RandomSampler(train_dataset)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=64, sampler=train_sampler
+    )
 
-        # By default, Adasum doesn't need scaling up learning rate.
-        lr_scaler = hvd.size() if not use_adasum else 1
+    test_dataset = torch.utils.data.TensorDataset(
+        torch.from_numpy(X_test).unsqueeze(1), torch.from_numpy(y_test)
+    )
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1000)
 
-        if cuda:
-            # Move model to GPU
-            model.cuda()
-            # If using GPU Adasum allreduce, scale learning rate by local_size.
-            if use_adasum and hvd.nccl_built():
-                lr_scaler = hvd.local_size()
+    model = Net()
 
-        # Horovod: scale learning rate by lr_scaler.
-        optimizer = optim.SGD(
-            model.parameters(), lr=lr * lr_scaler, momentum=momentum
-        )
+    # By default, Adasum doesn't need scaling up learning rate.
+    lr_scaler = hvd.size() if not use_adasum else 1
 
-        # Horovod: broadcast parameters & optimizer state.
-        hvd.broadcast_parameters(model.state_dict(), root_rank=0)
-        hvd.broadcast_optimizer_state(optimizer, root_rank=0)
+    if cuda:
+        # Move model to GPU
+        model.cuda()
+        # If using GPU Adasum allreduce, scale learning rate by local_size.
+        if use_adasum and hvd.nccl_built():
+            lr_scaler = hvd.local_size()
 
-        # Horovod: (optional) compression algorithm.
-        compression = (
-            hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
-        )
+    # Horovod: scale learning rate by lr_scaler.
+    optimizer = optim.SGD(
+        model.parameters(), lr=lr * lr_scaler, momentum=momentum
+    )
 
-        # Horovod: wrap optimizer with DistributedOptimizer.
-        optimizer = hvd.DistributedOptimizer(
-            optimizer,
-            named_parameters=model.named_parameters(),
-            compression=compression,
-            op=hvd.Adasum if use_adasum else hvd.Average,
-            gradient_predivide_factor=gradient_predivide_factor,
-        )
+    # Horovod: broadcast parameters & optimizer state.
+    hvd.broadcast_parameters(model.state_dict(), root_rank=0)
+    hvd.broadcast_optimizer_state(optimizer, root_rank=0)
 
-        for epoch in range(1, epochs + 1):
-            train(model, train_loader, train_sampler, optimizer, epoch, cuda)
-            test(model, test_dataset, test_loader, cuda)
+    # Horovod: (optional) compression algorithm.
+    compression = (
+        hvd.Compression.fp16 if fp16_allreduce else hvd.Compression.none
+    )
+
+    # Horovod: wrap optimizer with DistributedOptimizer.
+    optimizer = hvd.DistributedOptimizer(
+        optimizer,
+        named_parameters=model.named_parameters(),
+        compression=compression,
+        op=hvd.Adasum if use_adasum else hvd.Average,
+        gradient_predivide_factor=gradient_predivide_factor,
+    )
+
+    for epoch in range(1, epochs + 1):
+        train(model, train_loader, train_sampler, optimizer, epoch, cuda)
+        test(model, test_dataset, test_loader, cuda)
