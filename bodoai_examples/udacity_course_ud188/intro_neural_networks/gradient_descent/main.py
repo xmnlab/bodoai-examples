@@ -18,6 +18,9 @@ import bodo
 import numpy as np
 import pandas as pd
 
+# local
+from bodoai_examples.utils import bd_zip
+
 
 def setup():
     url = (
@@ -29,6 +32,14 @@ def setup():
 
     data_check = pd.read_csv(url, header=None)
     pd.testing.assert_frame_equal(data, data_check)
+
+    # duplicate data just for benchmark propose
+    dfs = []
+    for i in range(100):
+        dfs.append(data)
+    data = pd.concat(dfs).reset_index(drop=True)
+
+    data.to_csv('/tmp/data_10k.csv', header=None, index=None)
 
 
 # NON BODO AI FUNCTIONS
@@ -42,7 +53,8 @@ def read_data():
     -------
     tuple[numpy.ndarray, numpy.ndarray]
     """
-    data = pd.read_csv('/tmp/data.csv', header=None)
+    data = pd.read_csv('/tmp/data_10k.csv', header=None)
+
     X = np.array(data[[0, 1]])
     y = np.array(data[2])
     return X, y
@@ -129,7 +141,8 @@ def bd_read_data():
     -------
     tuple[numpy.ndarray, numpy.ndarray]
     """
-    data = pd.read_csv('/tmp/data.csv', header=None)
+    data = pd.read_csv('/tmp/data_10k.csv', header=None)
+
     X = data[['0', '1']].values
     y = data['2'].values
     return X, y
@@ -209,35 +222,40 @@ def bd_train(features, targets, epochs, learnrate, graph_lines=False):
         #     print(-weights[0]/weights[1], -bias/weights[1])
 
 
-@bodo.jit
-def bd_zip(np_a, np_b):
-    result = []
-    for i in range(np_b.shape[0]):
-        result.append((np_a[i], np_b[i]))
-    return result
-
-
 def main():
     setup()
+
+    # benchmark for NON bodo ai training
+    if bodo.get_rank() == 0:
+        t0 = time.time()
+
+        np.random.seed(44)
+        epochs = 100
+        learnrate = 0.01
+
+        X, y = read_data()
+        print(
+            '\n\nNON bodoai training, X.shape:', X.shape, ', y.shape:', y.shape
+        )
+
+        train(X, y, epochs, learnrate, True)
+
+        print('\n\nTime for NON bodoai training:', time.time() - t0, 's\n\n')
+
+        print('=' * 80, '\n\n')
+
+    # benchmark for bodo ai training
+    t0 = time.time()
 
     np.random.seed(44)
     epochs = 100
     learnrate = 0.01
 
-    # benchmark for NON bodo ai training
-    t0 = time.time()
-
-    X, y = read_data()
-    train(X, y, epochs, learnrate, True)
-
-    print('\n\nTime for NON bodoai training:', time.time() - t0, 's\n\n')
-
-    print('=' * 80, '\n\n')
-
-    # benchmark for bodo ai training
-    t0 = time.time()
-
     bd_X, bd_y = bd_read_data()
+
+    print(
+        '\n\nbodoai training, X.shape:', bd_X.shape, ', y.shape:', bd_y.shape
+    )
 
     bd_train(bd_X, bd_y, epochs, learnrate, True)
 

@@ -9,9 +9,11 @@ dependencies:
   - bokeh
   - boto3
   - botocore
+  - cmake
   - ipyparallel
   - ipython
   - numpy
+  - matplotlib
   - pandas
   - pip
   - pytest
