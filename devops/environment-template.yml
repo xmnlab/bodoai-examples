@@ -10,8 +10,10 @@ dependencies:
   - boto3
   - botocore
   - cmake
+  - dask
   - ipyparallel
   - ipython
+  - jupyterlab
   - numpy
   - matplotlib
   - pandas
@@ -19,11 +21,11 @@ dependencies:
   - pytest
   - python-dotenv
   - python
-  - pytorch=1.5
-  # - s3fs-fuse
+  - pytorch >=1.5
+  - s3fs-fuse
   - scipy
   - scikit-learn
-  - torchvision=0.6
+  - torchvision >=0.6
   # development
   - docker-compose
   - black

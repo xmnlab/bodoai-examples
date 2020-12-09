@@ -1,7 +1,7 @@
 
 TEST_PARAMS:=
 FILEPATH:=
-NUM_PROCESSES:=4
+NUM_PROCESSES:=1
 
 start-services:
 	docker-compose --file docker/docker-compose.yml up -d
